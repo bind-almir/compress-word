@@ -30,6 +30,7 @@ export class FargateRestApiStack extends cdk.Stack {
     });
 
     securityGroup.addIngressRule(ec2.Peer.anyIpv4(), ec2.Port.tcp(3333), 'Allow inbound traffic on port 3333');
+    securityGroup.addIngressRule(ec2.Peer.anyIpv4(), ec2.Port.tcp(80), 'Allow inbound traffic on port 80');
 
     const taskRole = new iam.Role(this, 'CRestTaskRole', {
       assumedBy: new iam.ServicePrincipal('ecs-tasks.amazonaws.com'),
@@ -63,6 +64,7 @@ export class FargateRestApiStack extends cdk.Stack {
     const loadBalancer = new elbv2.ApplicationLoadBalancer(this, 'CRestALB', {
       vpc,
       internetFacing: true,
+      securityGroup,
     });
 
     taskDefinition.addContainer('CApiContainer', {
