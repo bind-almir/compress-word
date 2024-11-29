@@ -13,5 +13,4 @@ COPY custom.c /app
 RUN gcc -o custom custom.c -lz
 COPY server.py /app
 RUN pip3 install flask
-EXPOSE 5000
 CMD ["python3", "server.py"]

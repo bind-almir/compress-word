@@ -16,21 +16,26 @@ export class FargateRestApiStack extends cdk.Stack {
       natGateways: 0,
     });
 
-    const cluster = new ecs.Cluster(this, 'Cluster', {
-      vpc,
-    });
-
-    vpc.addInterfaceEndpoint('ECREndpoint', {
-      service: ec2.InterfaceVpcEndpointAwsService.ECR,
-    });
-
     const securityGroup = new ec2.SecurityGroup(this, 'CustomCSG', {
       vpc,
       allowAllOutbound: true,
     });
 
     securityGroup.addIngressRule(ec2.Peer.anyIpv4(), ec2.Port.tcp(3333), 'Allow inbound traffic on port 3333');
-    securityGroup.addIngressRule(ec2.Peer.anyIpv4(), ec2.Port.tcp(80), 'Allow inbound traffic on port 80');
+
+    vpc.addInterfaceEndpoint('ECREndpoint', {
+      service: ec2.InterfaceVpcEndpointAwsService.ECR,
+    });
+
+    const loadBalancer = new elbv2.ApplicationLoadBalancer(this, 'CRestALB', {
+      vpc,
+      internetFacing: true,
+      securityGroup,
+    });
+
+    const cluster = new ecs.Cluster(this, 'Cluster', {
+      vpc,
+    });
 
     const taskRole = new iam.Role(this, 'CRestTaskRole', {
       assumedBy: new iam.ServicePrincipal('ecs-tasks.amazonaws.com'),
@@ -61,12 +66,6 @@ export class FargateRestApiStack extends cdk.Stack {
       executionRole: executionRole,
     });
 
-    const loadBalancer = new elbv2.ApplicationLoadBalancer(this, 'CRestALB', {
-      vpc,
-      internetFacing: true,
-      securityGroup,
-    });
-
     taskDefinition.addContainer('CApiContainer', {
       image: ecs.ContainerImage.fromRegistry(`${this.account}.dkr.ecr.${this.region}.amazonaws.com/c-rest:latest`),
       containerName: 'CApi',
@@ -77,7 +76,8 @@ export class FargateRestApiStack extends cdk.Stack {
         streamPrefix: 'CApiLogs',
         logGroup: new logs.LogGroup(this, 'CApiLogGroup', {
           logGroupName: '/ecs/c-rest-api',
-          retention: logs.RetentionDays.ONE_DAY ,
+          retention: logs.RetentionDays.ONE_DAY,
+          removalPolicy: cdk.RemovalPolicy.DESTROY,
         }),
       }),
       portMappings: [
@@ -109,8 +109,9 @@ export class FargateRestApiStack extends cdk.Stack {
       },
     });
 
-
-
-
+    new cdk.CfnOutput(this, 'RunCProgramEndpoint', {
+      value: `http://${loadBalancer.loadBalancerDnsName}/run`,
+    });
+    
   }
 }
